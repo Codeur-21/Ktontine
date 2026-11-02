@@ -1,0 +1,16 @@
+{
+    "name": "Kankirady Tontine",
+    "short_name": "Ktontine",
+    "background_color": "#ef7a3b",
+    "display": "fullscreen",
+    "description": "A Progressive Web Application setup for Laravel projects.",
+    "theme_color": "#ee7631",
+    "start_url": "/",
+    "icons": [
+        {
+            "src": "LogoKtontine.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}
