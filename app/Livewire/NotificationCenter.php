@@ -2,7 +2,6 @@
 
 namespace App\Livewire;
 
-use App\Models\Customer;
 use App\Models\Subscription;
 use App\Models\Tontine;
 use App\Models\TontinePayment;
@@ -81,15 +80,11 @@ class NotificationCenter extends Component
                 }
             });
 
-        foreach (TontinePayment::query()->where('tenant_id', $tenantId)->where('updated_at', '>=', $today->subDays(7))
+        foreach (TontinePayment::query()->where('tenant_id', $tenantId)->whereNotNull('voided_at')->where('updated_at', '>=', $today->subDays(7))
             ->whereHas('tontine.customer')->with('tontine.customer:id,tenant_id,name')->latest('updated_at')->limit(20)->get() as $payment) {
-            $voided = $payment->voided_at !== null;
-            $add('payment-'.$payment->id.'-'.sha1($payment->updated_at->toIso8601String().'|'.$payment->amount.'|'.$payment->voided_at?->toIso8601String()), $voided ? 'Cotisation annulée' : 'Cotisation enregistrée',
+            $add('payment-'.$payment->id.'-'.sha1($payment->updated_at->toIso8601String().'|'.$payment->amount.'|'.$payment->voided_at?->toIso8601String()), 'Cotisation annulée',
                 $payment->tontine->customer->name.' · '.number_format($payment->amount, 0, ',', ' ').' GNF · '.$payment->payment_date->format('d/m/Y'),
-                route('cotisations', ['tontine' => $payment->tontine_id]), $voided ? 'warning' : 'success');
-        }
-        foreach (Customer::query()->where('tenant_id', $tenantId)->where('created_at', '>=', $today->subDays(7))->latest()->limit(10)->get() as $customer) {
-            $add('customer-'.$customer->id, 'Nouveau client', $customer->name.' a rejoint votre espace.', route('clients'));
+                route('cotisations', ['tontine' => $payment->tontine_id]), 'warning');
         }
         $subscription = Subscription::query()->where('tenant_id', $tenantId)->latest('id')->first();
         if ($subscription) {

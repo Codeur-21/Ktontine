@@ -60,7 +60,7 @@
                 <livewire:notification-center />
 
                 <div class="account" @click.outside="accountOpen = false">
-                    <button class="avatar" @click="accountOpen = !accountOpen" :aria-expanded="accountOpen" aria-controls="account-menu" aria-label="Ouvrir le menu du compte">KT</button>
+                    <button class="avatar" @click="accountOpen = !accountOpen" :aria-expanded="accountOpen" aria-controls="account-menu" aria-label="Ouvrir le menu du compte de {{ auth()->user()->name }}" title="{{ auth()->user()->name }}">{{ \Illuminate\Support\Str::of(auth()->user()->name)->trim()->initials()->upper()->substr(0, 2) }}</button>
                     <nav id="account-menu" class="dropdown" x-cloak x-show="accountOpen" x-transition aria-label="Compte"><a href="{{ route('profile') }}">Mon profil</a>
                         <a href="/parametres">Paramètres</a>
 

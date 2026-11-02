@@ -27,7 +27,7 @@ class NotificationCenterTest extends TestCase
             $day = TontineDay::query()->create(['tontine_id' => $tontine->id, 'due_date' => $date, 'amount' => 50000]);
             TontinePayment::query()->create(['tontine_id' => $tontine->id, 'tontine_day_id' => $day->id, 'amount' => 50000, 'payment_date' => '2026-10-28', 'recorded_by' => $user->id]);
         }
-        $page->dispatch('payment-updated')->assertDontSee('Paiements en retard')->assertSee('Cotisation enregistrée');
+        $page->dispatch('payment-updated')->assertDontSee('Paiements en retard')->assertDontSee('Cotisation enregistrée');
         TontinePayment::query()->first()->update(['voided_at' => now()]);
         $page->call('$refresh')->assertSee('1 journée(s) à régulariser.')->assertSee('Cotisation annulée');
     }
@@ -86,10 +86,10 @@ class NotificationCenterTest extends TestCase
     {
         [$user, $tontine] = $this->workspace('alpha');
         $page = Livewire::actingAs($user)->test(NotificationCenter::class)
-            ->call('dismiss', 'customer-'.$tontine->customer_id)->assertDontSee('Nouveau client')
-            ->assertSee('Paiements en retard');
-        $page->call('$refresh')->assertDontSee('Nouveau client');
-        Livewire::actingAs($user)->test(NotificationCenter::class)->assertDontSee('Nouveau client');
+            ->call('dismiss', 'late-'.$tontine->id.'-2026-10-28-2')->assertDontSee('Paiements en retard')
+            ->assertSee('Fin de tontine proche');
+        $page->call('$refresh')->assertDontSee('Paiements en retard');
+        Livewire::actingAs($user)->test(NotificationCenter::class)->assertDontSee('Paiements en retard');
         $this->assertDatabaseHas('customers', ['id' => $tontine->customer_id]);
         $this->assertDatabaseHas('tontines', ['id' => $tontine->id]);
     }
@@ -110,8 +110,36 @@ class NotificationCenterTest extends TestCase
         [$alpha] = $this->workspace('alpha');
         [$beta, $foreign] = $this->workspace('beta');
         Livewire::actingAs($alpha)->test(NotificationCenter::class)
-            ->call('dismiss', 'customer-'.$foreign->customer_id)->assertNotFound();
-        Livewire::actingAs($beta)->test(NotificationCenter::class)->assertSee('Nouveau client');
+            ->call('dismiss', 'late-'.$foreign->id.'-2026-10-28-2')->assertNotFound();
+        Livewire::actingAs($beta)->test(NotificationCenter::class)->assertSee('Paiements en retard');
+    }
+
+    public function test_creations_and_successful_payments_do_not_generate_notifications(): void
+    {
+        [$user, $tontine] = $this->workspace('alpha');
+        $day = TontineDay::query()->create(['tontine_id' => $tontine->id, 'due_date' => '2026-10-26', 'amount' => 50000]);
+        TontinePayment::query()->create(['tontine_id' => $tontine->id, 'tontine_day_id' => $day->id, 'amount' => 50000, 'payment_date' => '2026-10-28', 'recorded_by' => $user->id]);
+
+        Livewire::actingAs($user)->test(NotificationCenter::class)
+            ->assertDontSee('Nouveau client')->assertDontSee('Cotisation enregistrée')
+            ->assertSee('Paiements en retard')->assertSee('Fin de tontine proche')
+            ->assertViewHas('items', fn ($items) => $items->count() === 2 && $items->every(fn ($item) => $item['type'] === 'warning'));
+        $this->assertDatabaseCount('customers', 1);
+        $this->assertDatabaseCount('tontine_payments', 1);
+    }
+
+    public function test_cancelling_the_confirmation_keeps_alerts_until_dismissal_is_confirmed(): void
+    {
+        [$user, $tontine] = $this->workspace('alpha');
+        $page = Livewire::actingAs($user)->test(NotificationCenter::class)
+            ->assertSee('clear-notifications-modal')->assertSee('Annuler')
+            ->assertDontSee('wire:confirm=', false)
+            ->assertViewHas('items', fn ($items) => $items->count() === 2);
+
+        $page->call('$refresh')->assertViewHas('items', fn ($items) => $items->count() === 2);
+        $page->call('dismissAll')->assertViewHas('items', fn ($items) => $items->isEmpty());
+        $this->assertDatabaseHas('customers', ['id' => $tontine->customer_id]);
+        $this->assertDatabaseHas('tontines', ['id' => $tontine->id]);
     }
 
     private function workspace(string $slug): array
